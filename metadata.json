@@ -1,0 +1,6 @@
+{
+  "name": "TaskFlow",
+  "description": "Корпоративный таск-менеджер для управления задачами, командами и аналитики отделов",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

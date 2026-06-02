@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role, department, and status metrics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "bgColor": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "administrator", "developer", "smm", "marketing", "designer", "operator", "guest"] },
+        "departmentId": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "activeTasks": { "type": "number" },
+        "completedTasks": { "type": "number" },
+        "overdueTasks": { "type": "number" },
+        "workload": { "type": "number" }
+      },
+      "required": ["id", "name", "email", "role", "isOnline"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Organizational task with checklist, comments, and change log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "assigneeIds": { "type": "array" },
+        "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+        "status": { "type": "string", "enum": ["new", "in_progress", "review", "changes", "done"] },
+        "deadline": { "type": "string" },
+        "checklist": { "type": "array" },
+        "comments": { "type": "array" },
+        "attachments": { "type": "array" },
+        "loggedTime": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "history": { "type": "array" },
+        "tags": { "type": "array" }
+      },
+      "required": ["id", "title", "departmentId", "priority", "status", "deadline", "creatorId"]
+    },
+    "ActivityEvent": {
+      "title": "ActivityEvent",
+      "description": "Log of system operations and changes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "memberAvatar": { "type": "string" },
+        "action": { "type": "string" },
+        "time": { "type": "string" },
+        "type": { "type": "string", "enum": ["success", "warning", "info", "error"] }
+      },
+      "required": ["id", "memberId", "memberName", "action", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with role details accessible to teammates and fully writable by owners"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Project tasks editable by assignees, owners, and admins"
+    },
+    "/activityEvents/{eventId}": {
+      "schema": "ActivityEvent",
+      "description": "System trace events generated on user mutations"
+    }
+  }
+}

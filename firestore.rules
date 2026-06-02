@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Is valid identifier helper
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Checks if the user has an active role (approved user)
+    function isActiveUser() {
+      return isEmailVerified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'guest';
+    }
+
+    // Checks if the user is an owner or admin
+    function isAdminOrOwner() {
+      return isEmailVerified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrator' || 
+        request.auth.token.email == 'halilovramazan394@gmail.com'
+      );
+    }
+
+    // Validate User Profile
+    function isValidUser(data) {
+      return data.id is string && data.id.size() <= 128 
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && data.avatar is string && data.avatar.size() <= 10
+        && data.bgColor is string && data.bgColor.size() <= 20
+        && data.role is string && (
+          data.role == 'owner' || 
+          data.role == 'administrator' || 
+          data.role == 'developer' || 
+          data.role == 'smm' || 
+          data.role == 'marketing' || 
+          data.role == 'designer' || 
+          data.role == 'operator' || 
+          data.role == 'guest'
+        )
+        && (data.departmentId is string || data.departmentId == null)
+        && data.isOnline is bool;
+    }
+
+    // Match users
+    match /users/{userId} {
+      allow read: if isEmailVerified();
+      
+      allow create: if isSignedIn() 
+        && isEmailVerified()
+        && userId == request.auth.uid 
+        && isValidUser(incoming())
+        && (
+          // Only the bootstrapped owner can set its role as owner/administrator
+          (incoming().role == 'owner' && request.auth.token.email == 'halilovramazan394@gmail.com') ||
+          // Everyone else starts as guest
+          (incoming().role == 'guest')
+        );
+
+      allow update: if isEmailVerified() && (
+        // A user can edit their own basic profile properties but not role/departmentId
+        (userId == request.auth.uid && isValidUser(incoming()) && incoming().role == existing().role && incoming().departmentId == existing().departmentId)
+        ||
+        // Admin or Owner can edit any user profile details
+        (isAdminOrOwner() && isValidUser(incoming()))
+      );
+
+      allow delete: if isAdminOrOwner();
+    }
+
+    // Validate Task
+    function isValidTask(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.departmentId is string && data.departmentId.size() <= 100
+        && data.priority is string && (data.priority == 'critical' || data.priority == 'high' || data.priority == 'medium' || data.priority == 'low')
+        && data.status is string && (data.status == 'new' || data.status == 'in_progress' || data.status == 'review' || data.status == 'changes' || data.status == 'done')
+        && data.deadline is string && data.deadline.size() <= 20
+        && data.creatorId is string && data.creatorId.size() <= 128
+        && data.assigneeIds is list
+        && data.checklist is list
+        && data.comments is list
+        && data.attachments is list
+        && data.history is list
+        && data.tags is list;
+    }
+
+    // Match tasks
+    match /tasks/{taskId} {
+      allow read: if isActiveUser();
+      
+      allow create: if isActiveUser() 
+        && isValidTask(incoming())
+        && incoming().creatorId == request.auth.uid;
+      
+      allow update: if isActiveUser() 
+        && isValidTask(incoming())
+        && (
+          isAdminOrOwner() ||
+          incoming().creatorId == existing().creatorId ||
+          (request.auth.uid in existing().assigneeIds)
+        );
+
+      allow delete: if isActiveUser() && (
+        isAdminOrOwner() || existing().creatorId == request.auth.uid
+      );
+    }
+
+    // Validate ActivityEvent
+    function isValidActivityEvent(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.memberId is string && data.memberId.size() <= 128
+        && data.memberName is string && data.memberName.size() <= 100
+        && data.memberAvatar is string && data.memberAvatar.size() <= 10
+        && data.action is string && data.action.size() <= 200
+        && data.time is string && data.time.size() <= 100
+        && data.type is string && (data.type == 'success' || data.type == 'warning' || data.type == 'info' || data.type == 'error');
+    }
+
+    // Match activityEvents
+    match /activityEvents/{eventId} {
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isValidActivityEvent(incoming());
+      allow update, delete: if isAdminOrOwner();
+    }
+  }
+}
